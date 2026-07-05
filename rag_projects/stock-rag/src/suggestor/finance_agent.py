@@ -47,8 +47,8 @@ class FinanceAgent(BaseAgent):
         suggegstion_output = await self.suggestion_agent.execute(suggestion_input)
 
         investment_sugggestions = pd.DataFrame(
-            [[key,value['Investment'],value['Time Period'],value['Expected Profit']] for key,value in suggegstion_output.suggestions.items()],
-            columns = ['Industry','Investment','Time Period','Expected Profit']
+            [[key,value['Investment'],value['Time Period'],value['Expected Profit'],value['Key Points']] for key,value in suggegstion_output.suggestions.items()],
+            columns = ['Industry','Investment','Time Period','Expected Profit','Key Points']
         )
         investment_sugggestions['Date'] = date.today()
 
@@ -56,8 +56,8 @@ class FinanceAgent(BaseAgent):
 
         psql_input = UploadingInput(
                                 dataset = investment_sugggestions,
-                                uploading_columns = ['Industry','Investment',	'Time Period',	'Expected Profit',	'Date'],
-                                sql_column_names = ['id', 'company','investment','time_period','expected_profit','created_at'],
+                                uploading_columns = ['Industry','Investment',	'Time Period',	'Expected Profit',	'Key Points', 'Date'],
+                                sql_column_names = ['id', 'company','investment','time_period','expected_profit','key_points','created_at'],
                                 table_name= 'stock_suggestions',
                             )
         

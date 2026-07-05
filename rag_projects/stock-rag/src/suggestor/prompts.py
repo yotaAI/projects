@@ -64,9 +64,10 @@ Instructions:
 Return your response strictly in the following JSON format:
 
 {{
-    "Investment": "Yes" | "No" | "Tentative",
+    "Investment": "Strong Yes" | "Yes"| "Tentative" | "No" | "Strong No",
     "Time Period": "1-2 Weeks" | "1-2 Months" | "1-2 Years" | "2+ Years",
-    "Expected Profit": "<Estimated percentage increase in stock value>"
+    "Expected Profit": "<Estimated percentage increase in stock value after the time period>"
+    "Key Points": "<Provide the list of key factors for investing or not investing in the stock.>"
 }}
 """
 

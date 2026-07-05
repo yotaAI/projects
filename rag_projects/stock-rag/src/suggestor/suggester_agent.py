@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional,Union,Literal
 import json
 # Pushing data to PostGrad SQL
 from transformers import Pipeline
-
+from tqdm import tqdm
 
 from ..base import BaseAgent, AgentInput, AgentOutput
 from .prompts import SUGGESTER_SYSTEM_PROMPT, SUGGESTER_PROMPT
@@ -24,39 +24,75 @@ class SuggesterAgent(BaseAgent):
     
     async def execute(self,input_data:SuggesterAgentInput) ->SuggesterAgentOutput:
         market_news = input_data.market_news
-        for company,resoning in market_news.items():
-            industry = resoning['industry']
-            positive_factors = [ factor for sentiment in resoning['sentiments'] for factor in sentiment['key_positive_factors']]
-            negagtive_factors = [ factor for sentiment in resoning['sentiments'] for factor in sentiment['key_negative_factors']]
+
+        companies = []
+        messages = []
+
+        for company,reasoning in tqdm(market_news.items(),total=len(market_news.keys())):
+            industry = reasoning['industry']
+
+            positive_factors = [
+                factor
+                for sentiment in reasoning["sentiments"]
+                for factor in sentiment["key_positive_factors"]
+            ]
+
+            negative_factors = [
+                factor
+                for sentiment in reasoning["sentiments"]
+                for factor in sentiment["key_negative_factors"]
+            ]
+
             reasonings = [
                 sentiment["reasoning"]
-                for sentiment in resoning["sentiments"]
+                for sentiment in reasoning["sentiments"]
                 if sentiment["sentiment"].lower() != "neutral"
             ]
 
-            positive_factors = '  - ' +"\n  - ".join(positive_factors)
-            negagtive_factors = '  - ' +"\n  - ".join(negagtive_factors)
-            reasonings = '  - ' +"\n  - ".join(reasonings)
-        
-            message  = [
-                        {
-                            'role':'system',
-                            'content':SUGGESTER_SYSTEM_PROMPT,
-                        },
-                        {
-                            'role': 'user',
-                            'content': SUGGESTER_PROMPT.format(
-                                company=company,
-                                industry = industry,
-                                positive_factors = positive_factors,
-                                negagtive_factors = negagtive_factors,
-                                reasonings = reasonings,
-                            ),
-                        }
-                    ]
-            result = self.model(message)
-            output = json.loads(result[0]['generated_text'][-1]['content'])
+            positive_factors = (
+                "  - " + "\n  - ".join(positive_factors)
+                if positive_factors else "None"
+            )
 
+            negative_factors = (
+                "  - " + "\n  - ".join(negative_factors)
+                if negative_factors else "None"
+            )
+
+            reasonings = (
+                "  - " + "\n  - ".join(reasonings)
+                if reasonings else "None"
+            )
+
+            message = [
+                {
+                    "role": "system",
+                    "content": SUGGESTER_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": SUGGESTER_PROMPT.format(
+                        company=company,
+                        industry=industry,
+                        positive_factors=positive_factors,
+                        negagtive_factors=negative_factors,
+                        reasonings=reasonings,
+                    ),
+                },
+            ]
+            companies.append(company)
+            messages.append(message)
+
+        # Batched inference
+        results = self.model(
+            messages,
+            batch_size=input_data.batch_size,
+            truncation=True,
+        )
+
+        # Parse outputs
+        for company, result in zip(companies, results):
+            output = json.loads(result[0]["generated_text"][-1]["content"])
             self.company_suggestions[company] = output
 
         return SuggesterAgentOutput(

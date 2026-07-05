@@ -55,7 +55,7 @@ class AnalystAgent(BaseAgent):
 
         self.logger.info('Starting Analysis...')
 
-        for idx,row in  input_data.company_df.iterrows():
+        for idx,row in  tqdm(input_data.company_df.iterrows(),total=input_data.company_df.shape[0]):
             company = row['Company Name']
             industry = row['Industry']
             self.market_news[company] = {
@@ -70,26 +70,45 @@ class AnalystAgent(BaseAgent):
                     industry=industry
                     ), self.conn
                 )
+            
+            if news_df.empty:
+                self.logger.warning(f"No news found for {company}")
+                continue
 
-            for idx,row in tqdm(news_df.iterrows(),total=len(news_df), desc=f"Company :'{company}' News article : "):
-                message = [
+            # Build all conversations
+            messages = [
+                [
                     {
-                        'role':'system',
-                        'content' : SYSTEM_PROMPT,
+                        "role": "system",
+                        "content": SYSTEM_PROMPT,
                     },
                     {
-                        'role':'user',
-                        'content': PROMPT.format(company_name = company,
-                                        industry = industry, 
-                                        title = row.title, 
-                                        content = row.content),
+                        "role": "user",
+                        "content": PROMPT.format(
+                            company_name=company,
+                            industry=industry,
+                            title=row.title,
+                            content=row.content,
+                        ),
                     },
                 ]
+                for _, row in news_df.iterrows()
+            ]
 
-                result = self.model(message)
-                sentiment = json.loads(result[0]['generated_text'][-1]['content'])
-                if sentiment['sentiment'].lower()!='neutral':
-                    self.market_news[company]['sentiments'].append(sentiment)
+
+            # Run batched inference
+            results = self.model(
+                messages,
+                batch_size=input_data.batch_size,
+                truncation=True,
+            )
+
+            # Process outputs
+            for result in results:
+                sentiment = json.loads(result[0]["generated_text"][-1]["content"])
+
+                if sentiment["sentiment"].lower() != "neutral":
+                    self.market_news[company]["sentiments"].append(sentiment)
                 
             self.market_news[company]['score'] = 0 if len(self.market_news[company]['sentiments'])==0 else sum([sentiment['sentiment_score'] * sentiment['confidence'] for sentiment in self.market_news[company]['sentiments']]) / len(self.market_news[company]['sentiments'])
 

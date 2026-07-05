@@ -32,7 +32,7 @@ async def main():
         # company_table_name= 'company_table',
         company_lists_csv = "https://archives.nseindia.com/content/indices/ind_nifty50list.csv",
         stock_table_name= 'stock_news_dataset',
-        batch_size=2,
+        batch_size=4,
     )
     agent =FinanceAgent(model=pipe)
     finance_out = await agent.execute(finance_input)
